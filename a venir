@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Événements à Venir </title>
+<style>
+body{font-family:Arial,sans-serif;background:#f9fafc;margin:0;padding:20px;color:#222}
+h2{text-align:center;margin-bottom:20px}
+#events{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;max-width:1100px;margin:0 auto}
+.card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1);transition:transform .2s}
+.card:hover{transform:translateY(-3px)}
+.card img{width:100%;height:180px;object-fit:cover}
+.card .info{padding:12px}
+.card h3{margin:0 0 6px}
+.card p{margin:0 0 8px;color:#555;line-height:1.4}
+</style>
+</head>
+<body>
+<h2>Événements à venir</h2>
+<div id="events">Chargement…</div>
+
+<script>
+const RSS_URL = 'https://lavieawatten.blogspot.com/feeds/posts/default/-/ÉVÉNEMENTS?alt=json';
+
+function parseDateFr(txt){
+  if(!txt) return null;
+  txt = txt.toLowerCase();
+  const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  mois.forEach((m,i)=>txt=txt.replace(m,i+1));
+  const m = txt.match(/(\\d{1,2})[\\/\\s-](\\d{1,2})[\\/\\s-](\\d{2,4})/);
+  if(!m) return null;
+  const j=parseInt(m[1]),mo=parseInt(m[2]),a=parseInt(m[3].length==2
+?'20'+m[3]:m[3]);
+  return new Date(a,mo-1,j);
+}
+
+async function loadEvents(){
+  try{
+    const r=await fetch(RSS_URL);
+    const data=await r.json();
+    const entries=data.feed.entry||[];
+    const events=[];
+    entries.forEach(e=>{
+      const title=e.title.$t;
+      const link=e.link.find(l=>l.rel==='alternate').href;
+      const html=e.content.$t;
+      const img=html.match(/<img[^>]+src=\"([^\"]+)\"/);
+      const dateTxt=(html.match(/📅\\s*([^<]+)/)||[])[1];
+      const date=parseDateFr(dateTxt);
+      if(date){
+        events.push({title,link,date,img:img?img[1]:'',desc:html.replace(/<[^>]+>/g,'').slice(0,140)+'...'});
+      }
+    });
+    // Tri croissant par date
+    events.sort((a,b)=>a.date-b.date);
+    const now=new Date();
+    const upcoming=events.filter(ev=>ev.date>=now);
+    const box=document.getElementById('events');
+    if(upcoming.length===0){box.innerHTML='<p>Aucun événement à venir.</p>';return;}
+    box.innerHTML=upcoming.map(ev=>`
+      <div class=\"card\">
+        ${ev.img?`<img src=\"${ev.img}\" alt=\"\">`:''}
+        <div class=\"info\">
+          <h3>${ev.title}</h3>
+          <p><strong>📅 ${ev.date.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}</strong></p>
+          <p>${ev.desc}</p>
+          <a href=\"${ev.link}\" target=\"_blank\">Voir plus →</a>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){
+    document.getElementById('events').textContent='Erreur de chargement.';
+    console.error(e);
+  }
+}
+loadEvents();
+</script>
+</body>
+</html>
